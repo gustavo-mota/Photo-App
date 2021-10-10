@@ -72,41 +72,36 @@ export default function App() {
     
   }
 
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   async function burstModeCamera(){
     //console.log('abriur burstModeCamera')
     if(camRef){
       //console.log('abriur camRef burstModeCamera')
-      for (var i = 0; i < 3; i++){
-        const data = await camRef.current.takePictureAsync()
-        //console.log('burstModeCamera - data', data);
-        const nData = JSON.parse(JSON.stringify(data));
-        setCapturePhoto(nData)
-        console.log('burstModeCamera - nData', nData);
-        //const asset = await MediaLibrary.createAssetAsync(nData)
-        const asset = await MediaLibrary.saveToLibraryAsync(nData.uri)
-        .then(
-          () => {
-            alert('burstModeCamera - salvo!');
-            
-          }
-        )
-        .catch(error => {
-          console.log("\x1b[35m%s\x1b[0m", 
-                      'burstModeCamera - erro de salvar\n' + 'Erro retornado: ' + error + '\nDado recebido: ' + typeof(nData.uri) 
-                      );
-        })
-        //console.log('burstModeCamera asset: ', asset);
-        console.log('burstModeCamera capturedPhoto: ', capturedPhoto);
       
-          //console.log('burstModeCamera after const data');
-          //console.log('burstModeCamera - ...[data]: ', ...[data]);
-          //const nData = JSON.parse(JSON.stringify(data));
-          //console.log('burstModeCamera nData.uri: ', nData);
-          //setBurstPhoto(nData.uri);
-          //setOpen(true); //checar
-          //return(nData);
+        for (var i = 0; i < 3; i++){
+          await sleep(2000);
+          const data = await camRef.current.takePictureAsync()
+          //console.log('burstModeCamera - data', data);
+          const nData = JSON.parse(JSON.stringify(data));
+          setCapturePhoto(nData)
+          console.log('burstModeCamera - nData', nData);
+          //const asset = await MediaLibrary.createAssetAsync(nData)
+          const asset = await MediaLibrary.saveToLibraryAsync(nData.uri)
+          .then( () => { alert('burstModeCamera - salvo!'); } )
+          .catch(error => {
+            console.log("\x1b[35m%s\x1b[0m", 
+                        'burstModeCamera - erro de salvar\n' + 'Erro retornado: ' + error + '\nDado recebido: ' + typeof(nData.uri) 
+                        );
+          })
+          //console.log('burstModeCamera asset: ', asset);
+          console.log('burstModeCamera capturedPhoto: ', capturedPhoto);
+
       }
     }
+    
   }
 
   async function burstSavePhoto(){
