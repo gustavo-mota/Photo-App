@@ -1,8 +1,10 @@
 import React, {useState, useEffect, useRef} from 'react';
-import { StyleSheet, Text, View, SafeAreaView, Touchable, TouchableOpacity, Modal, Image} from 'react-native';
+import {  StyleSheet, Text, View, 
+          SafeAreaView, Touchable, TouchableOpacity, 
+          Modal, Image} from 'react-native';
 import { Camera } from 'expo-camera';
-import {FontAwesome} from '@expo/vector-icons';
-import * as MeidaLibrary from 'expo-media-library';
+import {FontAwesome, FontAwesome5} from '@expo/vector-icons';
+import * as MediaLibrary from 'expo-media-library';
 import * as Permissions from 'expo-permissions';
 import { StatusBar } from 'expo-status-bar';
 
@@ -11,7 +13,9 @@ export default function App() {
   const [type, setType] = useState(Camera.Constants.Type.back)
   const [hasPermission, setHasPermission] = useState(null);
   const [capturedPhoto, setCapturePhoto] = useState(null);
-  const [open, setOpen] = useState(false);
+  const [burstPhoto, setBurstPhoto] = useState([])
+  const [open, setOpen] = useState(false); 
+  const [takeSucessivePicsVar, setTakeSucessivePicsVar] = useState(false); // sucessive captures
 
   useEffect(() => {
     (async () => {
@@ -34,25 +38,118 @@ export default function App() {
     return <Text>Acesso negado!</Text>;
   }
 
-  async function takePicture(){
-    if(camRef){
-      const data = await camRef.current.takePictureAsync();
-      setCapturePhoto(data.uri);
-      setOpen(true);
-      console.log(data);
+  async function takeSucessivePicturesTrigger(){
+    if(takeSucessivePicturesTriggerVar){
+      for (var i = 0; i < 9; i++) {
+        console.log(i);
+        // more statements
+      }
+      setTakeSucessivePicsVar(true);
     }
   }
 
+  async function takeSucessivePictures(){
+    /*let captures = []
+    for (var i = 0; i < 3; i++) {
+      //setTimeout( () => {burstModeCamera(), console.log(i), burstSavePhoto()}, 5000 )
+      //console.log('aqui takeSucessivePictures')
+      /*takePicture().finally(
+        () => {
+          savePicture();
+        }
+      );
+      const data = burstModeCamera().finally(
+      captures.push(JSON.parse(JSON.stringify(data)))
+      )
+      console.log('takeSucessivePictures iteration: ', i)
+      //burstSavePhoto()
+      
+      //savePicture() 
+      //takePicture()
+      //savePicture()     
+    }    
+    console.log(sizeof(captures));*/
+    
+  }
+
+  async function burstModeCamera(){
+    //console.log('abriur burstModeCamera')
+    if(camRef){
+      //console.log('abriur camRef burstModeCamera')
+      for (var i = 0; i < 3; i++){
+        const data = await camRef.current.takePictureAsync()
+        //console.log('burstModeCamera - data', data);
+        const nData = JSON.parse(JSON.stringify(data));
+        setCapturePhoto(nData)
+        console.log('burstModeCamera - nData', nData);
+        //const asset = await MediaLibrary.createAssetAsync(nData)
+        const asset = await MediaLibrary.saveToLibraryAsync(nData.uri)
+        .then(
+          () => {
+            alert('burstModeCamera - salvo!');
+            
+          }
+        )
+        .catch(error => {
+          console.log("\x1b[35m%s\x1b[0m", 
+                      'burstModeCamera - erro de salvar\n' + 'Erro retornado: ' + error + '\nDado recebido: ' + typeof(nData.uri) 
+                      );
+        })
+        //console.log('burstModeCamera asset: ', asset);
+        console.log('burstModeCamera capturedPhoto: ', capturedPhoto);
+      
+          //console.log('burstModeCamera after const data');
+          //console.log('burstModeCamera - ...[data]: ', ...[data]);
+          //const nData = JSON.parse(JSON.stringify(data));
+          //console.log('burstModeCamera nData.uri: ', nData);
+          //setBurstPhoto(nData.uri);
+          //setOpen(true); //checar
+          //return(nData);
+      }
+    }
+  }
+
+  async function burstSavePhoto(){
+
+    try{
+      //console.log('burstPhoto: ', burstPhoto)
+      console.log('busrtSavePhoto - data: ', data)
+      const data = burstPhoto.shift()
+      const asset = await MediaLibrary.createAssetAsync(data)
+      .then(
+        () => {
+          alert('Salvo com sucesso!');
+        }
+      )
+      .catch(error => {
+        console.log('burstSavePhoto - erro de salvar', error);
+      })
+
+    }catch(error){
+        console.log('lista vazia no shift', error);
+      }
+  }
+
   async function savePicture(){
-    const asset = await MeidaLibrary.createAssetAsync(capturedPhoto)
+    const asset = await MediaLibrary.createAssetAsync(capturedPhoto)
     .then(
       () => {
         alert('Salvo com sucesso!');
       }
     )
     .catch(error => {
-      console.log('err', error);
+      console.log('savePicture erro', error);
     })
+  }
+
+  async function takePicture(){
+    if(camRef){
+      const data = await camRef.current.takePictureAsync();
+      console.log('takePicture working, data.uri: ', data.uri)
+      setCapturePhoto(data.uri);
+      setOpen(true);
+      //console.log(data);
+    }
   }
 
 
@@ -64,7 +161,7 @@ export default function App() {
         ref={camRef}
       >
         <View style={styles.camFlip}>
-      <TouchableOpacity 
+      <TouchableOpacity //botão de flip
         style={styles.camFlipButton} 
         onPress={
           () => {
@@ -80,14 +177,24 @@ export default function App() {
       </TouchableOpacity>
       </View>
       </Camera>
-      <TouchableOpacity 
-        style={styles.pictureButton}
-        onPress={takePicture}>
-          <FontAwesome name='camera' size={25} color='#FFF'/>
+
+      <View style={{margin:10, flexDirection: 'row'}}>
+        <TouchableOpacity 
+          style={styles.pictureButton}
+          onPress={burstModeCamera}
+        >
+          <FontAwesome5 name='images' size={24} color='#FFF'/>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.pictureButton}
+          onPress={takePicture}>
+            <FontAwesome name='camera' size={25} color='#FFF'/>
         </TouchableOpacity>
 
         {
-          capturedPhoto &&
+          //capturedPhoto &&
+          false &&
           <Modal 
             animationType = "slide"
             transparent={false}
@@ -117,6 +224,7 @@ export default function App() {
               </View>
           </Modal>
         }
+        </View>
     </SafeAreaView>
     
   );
