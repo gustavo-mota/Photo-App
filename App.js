@@ -3,9 +3,12 @@ import {  StyleSheet, Text, View,
           SafeAreaView, Touchable, TouchableOpacity, 
           Modal, Image} from 'react-native';
 import { Camera } from 'expo-camera';
+import * as Location from 'expo-location';
 import {FontAwesome, FontAwesome5} from '@expo/vector-icons';
 import * as MediaLibrary from 'expo-media-library';
 import * as Permissions from 'expo-permissions';
+import * as FileSystem from "expo-file-system";
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { StatusBar } from 'expo-status-bar';
 
 export default function App() {
@@ -16,7 +19,42 @@ export default function App() {
   const [burstPhoto, setBurstPhoto] = useState([])
   const [open, setOpen] = useState(false); 
   const [takeSucessivePicsVar, setTakeSucessivePicsVar] = useState(false); // sucessive captures
+  const [location, setLocation] = useState(null);
+  const [errorMsg, setErrorMsg] = useState(null);
 
+  //request geolocalization
+  useEffect(() => {
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setErrorMsg('Permission to access location was denied');
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      setLocation(location);
+    })();
+  }, []);
+
+  let text = 'Waiting..';
+  if (errorMsg) {
+    text = errorMsg;
+  } else if (location) {
+    text = JSON.stringify(location);
+  }
+  // request media acess
+  useEffect( () => {
+    (async () => {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      console.log(status);
+      if (status !== 'granted'){
+        setErrorMsg('Permissão de acesso aos arquivos necessária para salvar as imagens')
+        return;
+      }
+    })();
+  }, []);
+
+  //request camera 
   useEffect(() => {
     (async () => {
       const {status} = await Camera.requestPermissionsAsync();
@@ -48,30 +86,6 @@ export default function App() {
     }
   }
 
-  async function takeSucessivePictures(){
-    /*let captures = []
-    for (var i = 0; i < 3; i++) {
-      //setTimeout( () => {burstModeCamera(), console.log(i), burstSavePhoto()}, 5000 )
-      //console.log('aqui takeSucessivePictures')
-      /*takePicture().finally(
-        () => {
-          savePicture();
-        }
-      );
-      const data = burstModeCamera().finally(
-      captures.push(JSON.parse(JSON.stringify(data)))
-      )
-      console.log('takeSucessivePictures iteration: ', i)
-      //burstSavePhoto()
-      
-      //savePicture() 
-      //takePicture()
-      //savePicture()     
-    }    
-    console.log(sizeof(captures));*/
-    
-  }
-
   function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -80,49 +94,61 @@ export default function App() {
     //console.log('abriur burstModeCamera')
     if(camRef){
       //console.log('abriur camRef burstModeCamera')
-      
-        for (var i = 0; i < 3; i++){
+        for (var i = 0; i < 27; i++){
           await sleep(2000);
-          const data = await camRef.current.takePictureAsync()
+          const data = await camRef.current.takePictureAsync({exif: true})
           //console.log('burstModeCamera - data', data);
-          const nData = JSON.parse(JSON.stringify(data));
-          setCapturePhoto(nData)
-          console.log('burstModeCamera - nData', nData);
-          //const asset = await MediaLibrary.createAssetAsync(nData)
-          const asset = await MediaLibrary.saveToLibraryAsync(nData.uri)
-          .then( () => { alert('burstModeCamera - salvo!'); } )
+          const geolocal = await Location.getCurrentPositionAsync({accuracy: Location.Accuracy.BestForNavigation})
+          //console.log("\x1b[36m%s\x1b[0m", 'burstModeCamera - geolocal var: ')
+          //console.log(geolocal);
+          const nData = JSON.parse(JSON.stringify(data)); //usado como segurança
+          //const tData = {...data, latitude: geolocal.coords.latitude, longitude: geolocal.coords.longitude}; //fadado a bugs
+          //console.log('burstModeCamera nData: ', nData);
+          //setCapturePhoto(nData);
+          //console.log('burstModeCamera - nData', nData);
+          // definindo nbome do arquivo com data, hora e coordenadas
+          const fileName = nData.uri.slice();
+          const fileData = nData.exif.DateTime.valueOf().toString().slice().replace(/:/g, '').replace(' ', '_');
+          const latitude = geolocal.coords.latitude.toString().slice().replace('.', '_').replace('-','0');
+          const longitude = geolocal.coords.longitude.toString().slice().replace('.', '_').replace('-','0');
+          const startIndex = fileName.lastIndexOf('/');
+          const endIndex = fileName.lastIndexOf('.');
+          const newFileName = fileData + "_" + 
+                            latitude + "_" + 
+                            longitude
+          //console.log('burstModeCamera newFileName: ', newFileName)
+          //definindo uri para salvar
+          const newUri = fileName.substring(0, startIndex+1) + newFileName + fileName.substring(endIndex);
+          //console.log('burstModeCamera newUri: ', newUri)
+          const rData = {...nData, "uri": newUri};
+          //console.log('rData: ', rData);
+          setCapturePhoto(rData);
+          
+          //const asset = await MediaLibrary.createAssetAsync(rData.uri)
+          //const asset = await MediaLibrary.addAssetsToAlbumAsync(rData, rData.uri.toString(), false)
+          //const asset = await MediaLibrary.saveToLibraryAsync(rData.uri)
+          
+          //await MediaLibrary.saveToLibraryAsync(rData.uri)
+          //MediaLibrary.addAssetsToAlbumAsync([assets], album, copyAssets)
+          await MediaLibrary.saveToLibraryAsync(nData.uri)
+          .then( () => { alert('burstModeCamera - salvo! imagem: ' + i.toString()); } )
           .catch(error => {
             console.log("\x1b[35m%s\x1b[0m", 
-                        'burstModeCamera - erro de salvar\n' + 'Erro retornado: ' + error + '\nDado recebido: ' + typeof(nData.uri) 
+                        'burstModeCamera - erro de salvar\n' + 'Erro retornado: ' + error + '\nDado recebido: ' + typeof(rData.uri) 
                         );
           })
+          let asset = await MediaLibrary.createAssetAsync(nData.uri);
+          const album = await MediaLibrary.getAlbumsAsync();
+          console.log('#######################')
+          console.log('albuns: ', album.filter( obj => {return obj.title === 'DCIM'} ))
+          console.log('asset: ', asset)
+          console.log("\x1b[34m%s\x1b[0m",
+                      "#################\niteration: "+i.toString())
+          //await MediaLibrary.addAssetsToAlbumAsync([asset], album, true)
           //console.log('burstModeCamera asset: ', asset);
-          console.log('burstModeCamera capturedPhoto: ', capturedPhoto);
-
+          //console.log('burstModeCamera capturedPhoto: ', capturedPhoto);
       }
     }
-    
-  }
-
-  async function burstSavePhoto(){
-
-    try{
-      //console.log('burstPhoto: ', burstPhoto)
-      console.log('busrtSavePhoto - data: ', data)
-      const data = burstPhoto.shift()
-      const asset = await MediaLibrary.createAssetAsync(data)
-      .then(
-        () => {
-          alert('Salvo com sucesso!');
-        }
-      )
-      .catch(error => {
-        console.log('burstSavePhoto - erro de salvar', error);
-      })
-
-    }catch(error){
-        console.log('lista vazia no shift', error);
-      }
   }
 
   async function savePicture(){
@@ -146,7 +172,6 @@ export default function App() {
       //console.log(data);
     }
   }
-
 
   return (
     <SafeAreaView style={styles.container}>
